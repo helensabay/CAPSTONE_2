@@ -6,17 +6,21 @@ import {
   TouchableOpacity,
   StyleSheet,
   ImageBackground,
+  Alert,
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useFonts, Roboto_400Regular, Roboto_700Bold, Roboto_900Black } from "@expo-google-fonts/roboto";
 
+import { forgotPassword } from "../api/api"; // <-- API call
+
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // Load fonts
   let [fontsLoaded] = useFonts({
@@ -26,14 +30,32 @@ export default function ForgotPasswordScreen() {
   });
   if (!fontsLoaded) return null;
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (!/\S+@\S+\.\S+/.test(email)) {
       setError("Please enter a valid email");
       return;
     }
     setError("");
-    // Perform reset action
-    router.push("/Login"); // Go back to login after reset
+    setLoading(true);
+
+    try {
+      const data = await forgotPassword(email.trim());
+
+      if (data.success) {
+        Alert.alert(
+          "Reset Email Sent",
+          `A reset code has been sent to ${email}. Check your email.`
+        );
+        router.push("/ResetPasswordScreen", { email }); // Navigate if you have a reset screen
+      } else {
+        Alert.alert("Error", data.message || "Email does not exist");
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Network error or server unreachable");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -57,7 +79,7 @@ export default function ForgotPasswordScreen() {
           <Text style={styles.subtitle}>Enter your email to reset your password</Text>
 
           <View style={styles.card}>
-            {/* Email */}
+            {/* Email Input */}
             <View style={styles.inputWrapper}>
               <MaterialCommunityIcons name="email-outline" size={20} color="#888" />
               <TextInput
@@ -71,8 +93,14 @@ export default function ForgotPasswordScreen() {
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             {/* Reset Button */}
-            <TouchableOpacity style={styles.button} onPress={handleReset}>
-              <Text style={styles.buttonText}>Reset Password</Text>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleReset}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? "Sending..." : "Reset Password"}
+              </Text>
             </TouchableOpacity>
 
             {/* Back to Login */}

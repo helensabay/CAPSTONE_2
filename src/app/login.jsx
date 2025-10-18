@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { loginUser } from "../api/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import {
   View,
   Text,
@@ -48,18 +51,44 @@ export default function LoginScreen() {
 
   const validateEmail = (email) => /\S+@\S+\.\S+/.test(email);
 
-  const handleLogin = () => {
-    let errs = {};
-    if (!validateEmail(email)) errs.email = "Invalid email address";
-    if (password.length < 6)
-      errs.password = "Password must be at least 6 characters";
-    setErrors(errs);
+const handleLogin = async () => {
+  // 1️⃣ Validate email & password
+  let errs = {};
+  if (!/\S+@\S+\.\S+/.test(email)) errs.email = "Invalid email address";
+  if (password.length < 6)
+    errs.password = "Password must be at least 6 characters";
+  setErrors(errs);
 
-    if (Object.keys(errs).length === 0) {
-      router.push("/(tabs)");
+  if (Object.keys(errs).length > 0) return; // Stop if validation fails
+
+  try {
+    // 2️⃣ Call backend login API
+    const data = await loginUser(email.trim(), password);
+
+    console.log("Login response:", data);
+
+    if (data.success) {
+      // 3️⃣ Store user info in AsyncStorage
+      await AsyncStorage.setItem("userEmail", data.email);
+      await AsyncStorage.setItem("userRole", data.role || "");
+
+      // If backend sends JWT in future:
+      // if (data.accessToken) await AsyncStorage.setItem("accessToken", data.accessToken);
+      // if (data.refreshToken) await AsyncStorage.setItem("refreshToken", data.refreshToken);
+
+      Alert.alert("Success", data.message || "Login successful!");
+      router.push("/(tabs)"); // Navigate to main app screen
+    } else {
+      Alert.alert("Login Failed", data.message || "Invalid credentials");
     }
-  };
-
+  } catch (error) {
+    console.error("Login error:", error.response?.data || error.message);
+    Alert.alert(
+      "Login Failed",
+      "Network error or server is unreachable."
+    );
+  }
+};
   // Load fonts
   let [fontsLoaded] = useFonts({
     Roboto_400Regular,
